@@ -1,9 +1,23 @@
+const {
+  pipe,
+  ifElse,
+  tryCatch,
+  when,
+  trim,
+  prop,
+  curry,
+  isEmpty,
+} = require("ramda");
+
 const consoleInput = document.querySelector(".console-input");
 const historyContainer = document.querySelector(".history");
 
-const logResult = (input, output, type = "success") => {
-  const outputString =
-    output instanceof Array ? `[${output.join(", ")}]` : output.toString();
+const getOutputString = (output) =>
+  output instanceof Array ? `[${output.join(", ")}]` : output.toString();
+
+const trimString = (element) => pipe(prop("value"), trim)(element);
+
+const logResult = (input, output, type) => {
   const inputLogDiv = document.createElement("div");
   const outputLogDiv = document.createElement("div");
 
@@ -12,25 +26,39 @@ const logResult = (input, output, type = "success") => {
   else outputLogDiv.classList.add("console-output-log", "error");
 
   inputLogDiv.textContent = `> ${input}`;
-  outputLogDiv.textContent = `${outputString}`;
+  outputLogDiv.textContent = `${getOutputString(output)}`;
   historyContainer.append(inputLogDiv, outputLogDiv);
 };
 
-consoleInput.addEventListener("keyup", (e) => {
-  const code = consoleInput.value.trim();
+const curriedLogResult = curry(logResult);
 
-  if (code.length === 0) {
-    return;
-  }
+const reset = () => {
+  consoleInput.value = "";
+  historyContainer.scrollTop = historyContainer.scrollHeight;
+};
 
-  if (e.key === "Enter") {
-    try {
-      logResult(code, eval(code));
-    } catch (error) {
-      logResult(code, error, "error");
-    }
+const handleKeyupEvent = (e) => {
+  pipe(
+    trimString,
+    ifElse(
+      isEmpty,
+      () => null,
+      (code) => {
+        pipe(
+          when(
+            () => prop("key", e) === "Enter",
+            () => {
+              tryCatch(
+                () => curriedLogResult(code)(eval(code))("success"),
+                (error) => curriedLogResult(code)(error)("error")
+              )();
+              reset();
+            }
+          )
+        )(code);
+      }
+    )
+  )(consoleInput);
+};
 
-    consoleInput.value = "";
-    historyContainer.scrollTop = historyContainer.scrollHeight;
-  }
-});
+consoleInput.addEventListener("keyup", handleKeyupEvent);
